@@ -1,0 +1,368 @@
+
+Requirement
+Check packages
+rpm -qa --queryformat "%{NAME}-%{VERSION}-%{RELEASE}(%{ARCH})\n" | grep <package_name>
+
+Packages yêu cầu trên Oracle Management Service (OMS)
+
+Oracle Linux 8
+Red Hat Linux 8	•	binutils-2.30-49.0.2.el8
+•	gcc-8.2.1-3.5.0.1.el8
+•	gcc-c++-8.2.1-3.5.0.1.el8
+•	glibc-2.28-42.0.1.el8.x86_64
+•	glibc-devel-2.28-42.0.1.el8.x86_64
+•	glibc-devel-2.17-55-i686
+•	libaio-0.3.110-12.el8.x86_64
+•	libaio-devel-0.3.110-12.el8.x86_64
+•	libgcc-8.2.1-3.5.0.1.el8.x86_64
+•	libstdc++-8.2.1-3.5.0.1.el8.x86_64
+•	libstdc++-devel-8.2.1-3.5.0.1.el8.x86_64
+•	libnsl.x86_64
+•	sysstat-11.7.3-2.el8
+•	motif-2.3.4-16.el8.x86_64
+•	motif-devel-2.3.4-16.el8.x86_64
+•	redhat-lsb-4.1-47.0.1.el8.x86_64
+•	redhat-lsb-core-4.1-47.0.1.el8.x86_64
+•	openssl-1.1.1-8.0.1.el8
+•	make-4.2.1-9.el8
+
+Packages yêu cầu trên Oracle Management Agent (OMA)
+
+Oracle Linux 8
+Red Hat Linux 8	•	binutils-2.30-49.0.2.el8
+•	glibc-common-2.17-55
+•	libaio-0.3.110-12.el8.x86_64
+•	libstdc++-8.2.1-3.5.0.1.el8.x86_64
+•	libnsl.x86_64
+•	sysstat-11.7.3-2.el8
+•	make-4.2.1-9.el8
+
+Port range (OMS)
+TCP/UDP port range phải lớn hơn 11000 với Oracle
+Check port range 
+$ cat /proc/sys/net/ipv4/ip_local_port_range
+
+Nếu port range thấp hơn 11000 thì edit
+# echo 11000 65000 > /proc/sys/net/ipv4/ip_local_port_range
+
+Sử dụng user root, để config không bị thay đổi
+# vi /etc/sysctl.conf
+net.ipv4.ip_local_port_range = 11000 65000
+
+Restart lại network
+# /etc/rc.d/init.d/network restart
+
+Setup
+Chuẩn bị
+OS	Oracle Linux 8
+RAM	16G
+CPU	8
+Disk OS	80G
+Disk DATA	150G
+
+Disable firewalld
+# systemctl stop firewalld
+# systemctl disable --now firewalld
+
+Disable SELinux
+# sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/sysconfig/selinux
+# sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+# sestatus
+
+Tạo partition mới để lưu cấu hình OEM
+# pvcreate /dev/sdb
+# vgcreate vg_oem /dev/sdb
+# lvcreate -n lv_oem -l +100%FREE vg_oem
+# mkfs.ext4 /dev/mapper/vg_oem-lv_oem
+
+Tạo thư mục cài OEM và mount 
+# mkdir /u01
+# vi /etc/fstab
+/dev/mapper/vg_oem-lv_oem		/u01		ext4		defaults	0 0
+
+Mount và check lại
+# mount -a
+# systemctl daemon-reload
+# df -h
+
+# yum install bind-utils -y
+# yum install chrony -y
+# vi /etc/chrony.conf
+
+Enable chrony
+# systemctl start chronyd
+# systemctl enable --now chronyd
+# systemctl status chronyd# systemctl status chronyd
+
+Môi trường sẽ cài đặt
+Platform	Linux x86_64, Oracle Linux 8.9
+Server IP	4.95.11.14
+Host Name	Oem.lgsp.bca
+OEM Version	13c Release 5 (13.5.0.0)
+OMS HOME	/u01/app/oracle/middleware
+Agent HOME	/u01/app/oracle/agent
+DB ORACLE HOME	/u01/app/oracle/product/19.0.0.0/dbhome_1
+Repository DB Name	OEMDB
+Repository DB Version	19.3.0.0.0
+OMS Binary Owner	oracle:oinstall
+DB Binary Owner	oracle:oinstall
+
+TCP/UDP port range OMS phải lớn hơn 11000
+# cat /proc/sys/net/ipv4/ip_local_port_range
+# echo 11000 65000 > /proc/sys/net/ipv4/ip_local_port_range
+
+# vi /etc/sysctl.conf
+net.ipv4.ip_local_port_range = 11000 65000
+
+# sysctl -p
+
+Reboot lại VM
+# reboot
+
+Setup DB
+Tạo các thư mục làm việc
+# mkdir -p /u01/soft
+# mkdir -p /u01/app/oracle/middleware
+# mkdir -p /u01/app/oracle/agent
+# mkdir -p /u01/app/oracle/product/19.0.0.0/dbhome_1
+
+Cài đặt các gói cần thiết
+# yum install oracle-database-preinstall-19c -y
+# yum update -y
+# yum install net-tools binutils gcc gcc-c++ glibc glibc-common glibc-devel glibc-devel.i686 libaio libaio-devel libgcc libstdc++ libstdc++-devel libnsl sysstat motif motif-devel redhat-lsb redhat-lsb-core openssl make -y
+
+Đổi password oracle
+# passwd oracle
+
+Tải các file software packages đã download lên OEM
+# ls -lrt /u01/soft
+
+Set permission cho /u01
+# chown -R oracle:oinstall /u01
+# chmod -R 755 /u01
+
+Install DB
+Login bằng user oracle 
+Giải nén bộ cài DB
+$ cd /u01/app/oracle/product/19.0.0.0/dbhome_1
+$ unzip -q /u01/soft/V982063-01.zip
+
+Đặt biến môi trường giả định oracle linux 7.9 và chạy 
+$ export CV_ASSUME_DISTID=OEL7.9
+$ ./runInstaller
+
+Chọn Set Up Software Only  Next
+Chọn Single instance database installation  Next
+Chọn Enterprise Edition  Next
+Tại Oracle Base, nhập /u01/app/oracle  Next
+Tại Inventory Directory, nhập /u01/app/oraInventory  Next
+Chuyển hết group thành oinstall  Next
+Chọn Next
+Sau khi chạy prequisite checks hoàn tất  Install
+Database software đang được cài đặt
+Hiển thị script cần được chạy bằng user root
+Sẽ chạy lần lượt từng script
+Sử dụng user root, chạy script
+# /u01/app/oraInventory/orainstRoot.sh
+
+Tiếp tục chạy
+# /u01/app/oracle/product/19.0.0.0/dbhome_1/root.sh
+
+Sau khi đã chạy 02 script  OK
+Đã hoàn thành cài đặt  Close
+Create DB
+Tạo database bằng user oracle
+Tại /u01/app/oracle/product/19.0.0.0/dbhome_1
+# cd bin
+# ./dbca
+
+Chọn Create a database  Next
+Nhập:
+-	Global database name: OEMDB
+-	Administrative password: *****
+Bỏ tích chọn Create as Container database  Next
+Chọn Finish
+Đang trong quá trình tạo database
+Có thể check log tại
+# tail -100f /u01/app/oracle/cfgtoollogs/dbca/OEMDB/trace.log_2024-10-24_02-19-21PM
+# tail -100f /u01/app/oracle/diag/rdbms/oemdb/OEMDB/trace/alert_OEMDB.log
+
+Đã hoàn thành cài đặt  Close
+Check DB
+Check DB instance
+$ cat /etc/oratab
+
+Các file khởi tạo DB
+$ cd /u01/app/oracle/product/19.0.0.0/dbhome_1/dbs
+$ ls -lrt
+
+ 
+Database đang chạy
+$ ps -ef | grep pmon
+$ ps -ef | grep tns
+
+ 
+Truy cập vào database
+$ . oraenv
+$ sqlplus / as sysdba
+
+Check instance và database
+SQL> select instance_name, status, database_status from v$instance;
+SQL> show pdbs;
+
+Create Listener & Service Name
+Tạo listener
+# cd /u01/app/oracle/product/19.0.0.0/dbhome_1/bin
+# ./netmgr
+
+Chọn Listeners  nhấn dấu + để tạo listener
+Đặt tên listener: LISTENER_OEMDB  OK
+Tạo address cho listener  Add Address
+Nhập thông tin address cho listener:
+-	Host: oem.localdomain
+-	Port: 1521
+Tạo Service Name  chọn Service Naming  chọn + để tạo
+Đặt tên cho Service Name: OEMDB  Next
+Chọn Next
+Nhập:
+-	Host name: oem.localdomain
+-	Port number: 1521
+ Next
+Nhập service name: OEMDB  Next
+Chọn Finish
+Đã tạo Service Name
+Chọn File  Save Network Configuration
+Chọn File  Exit
+Vào thư mục cấu hình network
+$ cd /u01/app/oracle/product/19.0.0.0/dbhome_1/network/admin
+
+Xem file listener và servie name
+# cat listener.ora
+# cat tnsname.ora
+
+Check trạng thái listener
+$ lsnrctl status LISTENER_OEMDB
+
+Start listener
+# lsnrctl start LISTENER_OEMDB
+
+Check trạng thái listener
+$ lsnrctl status LISTENER_OEMDB
+
+Test ping
+# tnsping OEMDB
+
+Edit Database Parameter
+Vào database check session cache
+$ sqlplus / as sysdba
+SQL> select name, open_mode from v$database;
+SQL> show parameter session_cached_cursors;
+
+Đặt giá trị session cache thành 200
+SQL> alter system set "_allow_insert_with_update_check"=true scope=both;
+SQL> alter system set session_cached_cursors=200 scope=spfile;
+
+Chỉnh share pool
+SQL> alter system set shared_pool_size=600M scope=spfile;
+SQL> alter system set processes=600 scope=spfile;
+
+Restart lại DB
+SQL> shutdown immediate;
+SQL> startup;
+
+Install OEM
+Di chuyển tới thư mục chứa file nén
+$ cd /u01/soft
+
+Giải nén file 
+$ unzip V1007079-01.zip
+$ unzip V1007080-01.zip
+$ unzip V1007081-01.zip
+$ unzip V1007082-01.zip
+$ unzip V1007083-01.zip
+
+Sau khi giải nén sẽ nhận được 01 file .bin, chạy file này để cài đặt
+# ./em13500_linux64.bin
+
+ Next
+Chọn Skip  Next
+Check prequisites, nếu có warnning thì nên check log và fix cho hết lỗi thành succeeded
+Chọn Next
+Nhập thông tin để install
+-	Middleware home: /u01/app/oracle/middleware
+-	Agent base: /u01/app/oracle/agent
+-	Host name: oem.localdomain
+Chọn Next
+Tạo Administrator Password cho OEM 
+Nhập thông tin DB
+-	Database hostname: oem.localdomain
+-	Port: 1521
+-	Service/SID: OEMDB
+-	SYS Password: *****
+ Next
+Check database prequisites, nếu có Failed  Auto Fix  Next
+Đã succeeded  Next
+Chọn OK
+Software Library để default  Next
+ Install
+Đang trong quá trình cài đặt
+Check log tại
+# cd /tmp/OraInstall2024-10-24_02-41-18PM
+
+Tail log
+# tail -100f /tmp/OraInstall2024-10-24_02-41-18PM/install2024-10-24_02-41-18PM.log
+
+After 1h45p
+Chạy script bằng user root
+Dùng user root
+# /u01/app/oracle/middleware/allroot.sh
+
+Đã hoàn thành cài đặt OEM  Close
+Đã cài đặt thành công
+Check OEM
+Check trạng thái OMS
+$ export OMS_HOME=/u01/app/oracle/middleware
+$ /u01/app/oracle/middleware/bin/emctl status oms
+
+Check trạng thái OMS details
+$ /u01/app/oracle/middleware/bin/emctl status oms -details
+
+Check agent
+$ export AGENT_HOME=/u01/app/oracle/agent/agent_inst
+$ /u01/app/oracle/agent/agent_inst/bin/emctl status agent
+
+Check EM CLI
+$ /u01/app/oracle/middleware/bin/emcli status
+
+Truy cập OEM 
+https://oem.localdomain:7803/em
+sysman/*****
+
+Chọn I Accept
+
+Welcome dashboard
+
+Truy cập EMAgent
+https://oem.localdomain:3872/emd/main
+
+Truy cập Upload
+https://oem.localdomain:4903/empbs/upload
+
+note:
+Chỉ có thể connect database bằng PDB
+Phần Database Prequisite Checks có lỗi
+‘Check if Password verification function is Enabled’
+Check lại PDB_1 chưa được Read/Write
+SQL> show pdbs;
+SQL> alter session set container=PDB_1;
+
+Open PDB_1
+SQL> alter pluggable database PDB_1 open;
+SQL> alter pluggable database PDB_1 save state;
+SQL> show pdbs;
+
+Bỏ qua việc verify password
+SQL> alter profile default limit password_verify_function null;
+
+
+
